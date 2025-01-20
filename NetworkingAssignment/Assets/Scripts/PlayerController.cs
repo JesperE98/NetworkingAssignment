@@ -1,20 +1,23 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Experimental.GlobalIllumination;
 using UnityEngine.InputSystem;
 
 
 [RequireComponent((typeof(CharacterController)))]
-public class PlayerController : MonoBehaviour {
+public class PlayerController : NetworkBehaviour {
     
+    private Spawner spawner;
     private InputActionAsset inputActionAsset;
     
     [Header("Player Settings")]
     [SerializeField]
     private PlayerStats _playerStats;
-    
-    [Header("Player Camera")]
     [SerializeField]
-    private Transform _playerCamera;
+    private Transform _respawnPoint;
+    [SerializeField] private float  _fallThreshhold = -10f;
+    
+    private                  Camera _playerCamera;
     
     private CharacterController _characterController;
     private InputSystem_Actions _inputSystem;
@@ -33,14 +36,18 @@ public class PlayerController : MonoBehaviour {
         _characterController = GetComponent<CharacterController>();
     }
 
-    private void OnEnable() {
+    public override void OnNetworkSpawn() {
+        spawner = GameObject.Find("SpawnManager").GetComponent<Spawner>();
         _inputSystem.Player.Enable();
         _inputSystem.UI.Enable();
+        base.OnNetworkSpawn();
     }
 
-    private void OnDisable() {
+    public override void OnNetworkDespawn() {
         _inputSystem.Player.Disable();
         _inputSystem.UI.Disable();
+        
+        base.OnNetworkDespawn();
     }
 
     void Start() {
@@ -50,9 +57,34 @@ public class PlayerController : MonoBehaviour {
     void Update()
     {
         _inputSystem.Player.Jump.performed += ctx => OnJumpPressed();
+        _inputSystem.Player.Ping.performed += ctx => {
+                                                  spawner.PingServerRpc(new Vector3(transform.localPosition.x,
+                                                                            transform.localPosition.y + 1,
+                                                                            transform.localPosition.z));
+                                              };
+
+        // Respawns the player if they fall
+        if (IsOwner && transform.position.y < _fallThreshhold) {
+            TriggerRespawnServerRpc();
+        }
+        
         Jump();
         Movement();
         Look();
+        
+    }
+
+    [ServerRpc]
+    private void TriggerRespawnServerRpc() {
+        RespawnPlayer();
+    }
+
+    private void RespawnPlayer() {
+        if (!IsServer) return;
+        
+        RespawnTrigger respawnPoint = new RespawnTrigger();
+        
+        transform.position = respawnPoint.transform.position;
     }
 
     private void InitializePlayerMovement() {
@@ -79,7 +111,7 @@ public class PlayerController : MonoBehaviour {
             _xRotation -= NonNormalizedDelta.y * _playerStats._sensitivity;
         
             transform.Rotate(0f, NonNormalizedDelta.x * _playerStats._sensitivity, 0f);
-            _playerCamera.localRotation = Quaternion.Euler(_xRotation, 0f, 0f);
+            _playerCamera.transform.localRotation = Quaternion.Euler(_xRotation, 0f, 0f);
         }
     }
     
@@ -105,16 +137,4 @@ public class PlayerController : MonoBehaviour {
             _jumpedPressed = true;
         }
     }
-    // private bool IsGrounded() {
-    //     
-    //     if (Physics.Raycast(transform.position, Vector3.down, out _hit, 0.6f, layerMask)) {
-    //         Debug.DrawRay(transform.position, Vector3.down, Color.red);
-    //         return true;
-    //     }
-    //     else {
-    //         Debug.DrawRay(transform.position, Vector3.down, Color.white);
-    //         return false;
-    //     }
-    // }
-    
 }

@@ -1,10 +1,9 @@
 using Unity.Netcode;
 using UnityEngine;
-using Assets.MyFolder.Scripts.PlayerScripts;
 
 public class ClientPlayerMove : NetworkBehaviour {
 
-   [SerializeField] private Player _player;
+   [SerializeField] private PlayerController _player;
    private void Awake() {
       _player.enabled = false;
    }

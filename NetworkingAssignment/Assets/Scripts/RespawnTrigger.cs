@@ -1,25 +1,34 @@
 using System;
+using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
 [RequireComponent(typeof(BoxCollider))]
-public class RespawnTrigger : MonoBehaviour
+public class RespawnTrigger : NetworkBehaviour
 {
     [SerializeField]
     private Transform respawnPoint;
 
+    
     private BoxCollider _collider;
 
-    private void Start() {
+    public override void OnNetworkSpawn() {
         _collider = GetComponent<BoxCollider>();
 
         _collider.enabled   = true;
         _collider.isTrigger = true;
         _collider.size      = new Vector3(100, 5, 100);
+        
+        base.OnNetworkSpawn();
     }
 
+    
     private void OnTriggerEnter(Collider other) {
         if (other.tag == "Player") {
-            other.transform.localPosition = respawnPoint.position;
+            
+            print("Respawning player");
+            
+            other.transform.position = respawnPoint.position;
         }
     }
 }
